@@ -3,14 +3,19 @@ package main
 import (
 	"log"
 	"os"
-
-	_ "github.com/lib/pq"
 )
 
 func main() {
-	config, err := readConfig()
+	err := run()
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func run() error {
+	config, err := readConfig()
+	if err != nil {
+		return err
 	}
 
 	mode := config.Modes[config.Default]
@@ -25,32 +30,40 @@ func main() {
 
 	db, err := sqlConnect(mode.Connect)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	result, err := db.sqlGenericQuery(mode.Select)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Printf("result = %v\n", result)
-	//return
 
-	/*
-		columns := []string{"one", "two", "three"}
-		data := [][]string{
-			{"1", "2", "3"},
-			{"4", "5", "6"},
-		}
-	*/
 	f, err := os.CreateTemp("", "sqlvi.*.org")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	defer os.Remove(f.Name())
+	tmpName := f.Name()
+	defer os.Remove(tmpName)
 
-	writeOrgtable(f, result.Columns, result.Strings)
+	writeOrgTable(f, result.Columns, result.Strings)
+	if err = f.Close(); err != nil {
+		return err
+	}
 
 	err = callEditor(f.Name())
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	f, err = os.Open(tmpName)
+	if err != nil {
+		return err
+	}
+	cols, data, err := readOrgTable(f)
+	if err != nil {
+		return err
+	}
+	log.Printf("cols = %v\n", cols)
+	log.Printf("data = %v\n", data)
+	return nil
 }

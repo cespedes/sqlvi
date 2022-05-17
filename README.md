@@ -5,6 +5,8 @@ a SQL query as a text table, and launches an editor for the user.
 After the editor finishes, it calculates if there are changes and, if so,
 it updates the database accordingly.
 
+In this state, it only works with PostgreSQL databases.
+
 ## Work in progress
 
 This project is a work in progress.  Right now, it cannot do any changes in SQL:
@@ -23,9 +25,14 @@ When `sqlvi` executes, it does the following:
 - In a transaction, it inserts, updates, or drops rows from the database
 
 The SQL queries that `sqlvi` executes must be specified in the configuration file,
-and the first row must be a primary key, not null and different from all the other lines.
+and the first column must be unique and not null (typically the primary key).
 
-## Conficuration file
+The header (first row) and the primary key (first column) should not be modified.
+When a row is modified, it executes an *update*.
+When a row is deleted, it executes a *drop*.
+When the user inserts a new row, with the primary key empty, it executes an *insert*.
+
+## Configuration file
 
 `sqlvi` reads a YAML file (`$HOME/.sqlvi.yaml` by default) similar to this:
 
@@ -49,16 +56,20 @@ and the first row must be a primary key, not null and different from all the oth
 
 The text table has this layout:
 
-    |----+---------+---------+------------|
-    | id | country | capital | population |
-    |----+---------+---------+------------|
-    | 1  | Spain   | Madrid  | 47450795   |
-    | 2  | Germany | Berlin  | 83190556   |
-    |----+---------+---------+------------|
+    |----+---------+---------+----------|
+    | id | country | capital | language |
+    |----+---------+---------+----------|
+    | 1  | Spain   | Madrid  | Spanish  |
+    | 2  | Germany | Berlin  | German   |
+    | 3  | France  | Paris   | French   |
+    |----+---------+---------+----------|
 
-It should have:
-- A separator line, beginning with `|--`.
+It should have these lines, and in this order:
+- 0 or more lines that do not contain `|---` (which will be ignored).
+- A separator line, beginning with `|---`.
 - A line with list of column names, beginning and ending with `|` and separated by `|`.
-- A separator line, beginning with `|--`.
+- A separator line, beginning with `|---`.
 - A line for each row, beginning and ending with `|`, and with values separated by `|`.
-- A separator line, beginning with `|--`.
+  The first field should be unique and non-empty.
+- A separator line, beginning with `|---`.
+- 0 or more lines after that one (ignored).

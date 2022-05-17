@@ -81,5 +81,8 @@ func sqlString(a interface{}) string {
 	if s, ok := a.([]byte); ok {
 		return fmt.Sprint(string(s))
 	}
+	if a == nil {
+		return ""
+	}
 	return fmt.Sprint(a)
 }

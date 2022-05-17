@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
 )
 
-func writeOrgtable(w io.Writer, columns []string, data [][]string) {
+func writeOrgTable(w io.Writer, columns []string, data [][]string) {
 	widths := make([]int, len(columns))
 	for i, x := range columns {
 		widths[i] = utf8.RuneCountInString(x)
@@ -39,6 +40,53 @@ func writeOrgtable(w io.Writer, columns []string, data [][]string) {
 	fmt.Fprintln(w, line)
 }
 
-func readOrgtable(r io.Reader) (columns []string, data [][]string) {
-	return columns, data
+func readOrgLine(line string) []string {
+	s := strings.Split(line, "|")
+	if len(s) < 3 {
+		return nil
+	}
+	s = s[1 : len(s)-1]
+	for i := range s {
+		s[i] = strings.TrimSpace(s[i])
+	}
+	return s
+}
+
+func readOrgTable(r io.Reader) (columns []string, data [][]string, err error) {
+	lineNo := 0
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		lineNo++
+		if strings.Contains(s.Text(), `|---`) {
+			break
+		}
+	}
+	if !s.Scan() {
+		return nil, nil, fmt.Errorf("No table found after reading %d lines of text.", lineNo)
+	}
+	lineNo++
+	columns = readOrgLine(s.Text())
+	if len(columns) == 0 {
+		return nil, nil, fmt.Errorf("Wrong header for table in line %d.", lineNo)
+	}
+	if !s.Scan() {
+		return nil, nil, fmt.Errorf("No table found after header in line %d.", lineNo)
+	}
+	lineNo++
+	if !strings.Contains(s.Text(), `|---`) {
+		return nil, nil, fmt.Errorf("Wrong table found after header in line %d.", lineNo)
+	}
+	for s.Scan() {
+		lineNo++
+		line := s.Text()
+		if strings.Contains(line, `|---`) {
+			break
+		}
+		s := readOrgLine(s.Text())
+		if len(s) != len(columns) {
+			return nil, nil, fmt.Errorf("Wrong number of columns in line %d.", lineNo)
+		}
+		data = append(data, s)
+	}
+	return columns, data, nil
 }

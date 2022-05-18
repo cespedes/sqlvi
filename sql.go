@@ -2,15 +2,12 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
-
-type db struct {
-	db *sqlx.DB
-}
 
 // SQLGenericResult holds the result of a SQL query
 type SQLGenericResult struct {
@@ -28,19 +25,17 @@ type SQLGenericResult struct {
 // - bool
 // - []byte
 
-func sqlConnect(connStr string) (db, error) {
-	var err error
-	db := db{}
-	db.db, err = sqlx.Connect("postgres", connStr)
+func sqlConnect(connStr string) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		return db, err
 	}
 	return db, nil
 }
 
-func (db *db) sqlGenericQuery(query string, args ...interface{}) (SQLGenericResult, error) {
+func sqlGenericQuery(db *sqlx.DB, query string, args ...interface{}) (SQLGenericResult, error) {
 	result := SQLGenericResult{}
-	rows, err := db.db.Query(query)
+	rows, err := db.Query(query)
 	if err != nil {
 		return result, err
 	}
@@ -85,4 +80,25 @@ func sqlString(a interface{}) string {
 		return ""
 	}
 	return fmt.Sprint(a)
+}
+
+// sqlBind converts a query with DOLLAR bindvars ($1, $2...) into driver's bindvar type
+func sqlBind(db *sqlx.DB, query string, args []string) (string, []string) {
+	var res string
+	var resArgs []string
+	// First, we convert DOLLARs into QUESTIONs
+	for i := strings.Index(query, "$"); i != -1; i = strings.Index(query, "$") {
+		res += query[:i]
+		query = query[i+1:]
+		argNum := 0
+		for len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
+			argNum *= 10
+			argNum += int(query[0]) - '0'
+			query = query[1:]
+		}
+		res += "?"
+		resArgs = append(resArgs, args[argNum-1])
+	}
+	res += query
+	return db.Rebind(res), resArgs
 }

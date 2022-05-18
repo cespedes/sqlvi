@@ -14,9 +14,10 @@ func runCommand(name string, args ...string) error {
 	return err
 }
 
-func callEditor(args ...string) error {
+func (app *app) callEditor(args ...string) error {
 	var err error
 	strs := []string{
+		app.Editor,
 		os.Getenv("VISUAL"),
 		os.Getenv("EDITOR"),
 		"editor",

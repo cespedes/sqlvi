@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
@@ -19,13 +17,13 @@ import (
        select: SELECT id,country,capital,population FROM countries
        insert: INSERT INTO countries (country,capital,population) VALUES ($2,$3,$4)
        update: UPDATE countries SET country=$2,capital=$3,population=$4 WHERE id=$1
-       drop: DROP countries WHERE id=$1
+       delete: DELETE FROM countries WHERE id=$1
      products:
        connect: postgres://user:pass@host/database
        select: SELECT id,name,price FROM products
        insert: INSERT INTO products (name,price) VALUES ($2,$3)
        update: UPDATE products SET name=$2,price=$3 WHERE id=$1
-       drop: DROP product WHERE id=$1
+       delete: DELETE FROM product WHERE id=$1
 */
 
 type configMode struct {
@@ -33,7 +31,7 @@ type configMode struct {
 	Select  string
 	Insert  string
 	Update  string
-	Drop    string
+	Delete  string
 }
 
 type config struct {
@@ -42,18 +40,38 @@ type config struct {
 	Modes   map[string]configMode
 }
 
-func readConfig() (config, error) {
-	configFileName := filepath.Join(os.Getenv("HOME"), ".sqlvi.yaml")
+func (app *app) readConfig(modeName string) error {
+	var config config
 
-	log.Printf("Reading config file %s", configFileName)
-	c := config{}
-	data, err := ioutil.ReadFile(configFileName)
+	if app.Debug {
+		log.Printf("Reading config file %s", app.ConfigFile)
+	}
+	data, err := ioutil.ReadFile(app.ConfigFile)
 	if err != nil {
-		return c, fmt.Errorf("reading %s: %w", configFileName, err)
+		return fmt.Errorf("reading %s: %w", app.ConfigFile, err)
 	}
-	if err := yaml.UnmarshalStrict(data, &c); err != nil {
-		return c, fmt.Errorf("parsing %s: %w", configFileName, err)
+	if err := yaml.UnmarshalStrict(data, &config); err != nil {
+		return fmt.Errorf("parsing %s: %w", app.ConfigFile, err)
 	}
-	return c, nil
 
+	if modeName == "" {
+		modeName = config.Default
+	}
+
+	mode, ok := config.Modes[modeName]
+	if !ok {
+		return fmt.Errorf("mode %q not found in config file", modeName)
+	}
+
+	if app.Debug {
+		log.Printf("Using mode = %q\n", modeName)
+	}
+
+	app.Connect = mode.Connect
+	app.Select = mode.Select
+	app.Insert = mode.Insert
+	app.Update = mode.Update
+	app.Delete = config.Modes[modeName].Delete
+
+	return nil
 }

@@ -22,14 +22,14 @@ When `sqlvi` executes, it does the following:
 - Displays SQL result as an Org-mode text table
 - Launches an editor for the user to see and modify the text table
 - After the editor finishes, it finds the altered rows
-- In a transaction, it inserts, updates, or drops rows from the database
+- In a transaction, it inserts, updates, or deletes rows from the database
 
 The SQL queries that `sqlvi` executes must be specified in the configuration file,
 and the first column must be unique and not null (typically the primary key).
 
 The header (first row) and the primary key (first column) should not be modified.
 When a row is modified, it executes an *update*.
-When a row is deleted, it executes a *drop*.
+When a row is deleted, it executes a *delete*.
 When the user inserts a new row, with the primary key empty, it executes an *insert*.
 
 ## Configuration file
@@ -44,13 +44,13 @@ When the user inserts a new row, with the primary key empty, it executes an *ins
         select: SELECT id,country,capital,population FROM countries
         insert: INSERT INTO countries (country,capital,population) VALUES ($2,$3,$4)
         update: UPDATE countries SET country=$2,capital=$3,population=$4 WHERE id=$1
-        drop: DROP countries WHERE id=$1
+        delete: DELETE FROM countries WHERE id=$1
       products:
         connect: postgres://user:pass@host/database
         select: SELECT id,name,price FROM products
         insert: INSERT INTO products (name,price) VALUES ($2,$3)
         update: UPDATE products SET name=$2,price=$3 WHERE id=$1
-        drop: DROP product WHERE id=$1
+        delete: DELETE FROM product WHERE id=$1
 
 ## Text table
 

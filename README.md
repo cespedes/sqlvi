@@ -41,9 +41,9 @@ When the user inserts a new row, with the primary key empty, it executes an *ins
     modes:
       countries:
         connect: postgres://user:pass@host/database
-        select: SELECT id,country,capital,population FROM countries
-        insert: INSERT INTO countries (country,capital,population) VALUES ($2,$3,$4)
-        update: UPDATE countries SET country=$2,capital=$3,population=$4 WHERE id=$1
+        select: SELECT id,country,capital,language FROM countries
+        insert: INSERT INTO countries (country,capital,language) VALUES ($2,$3,$4)
+        update: UPDATE countries SET country=$2,capital=$3,language=$4 WHERE id=$1
         delete: DELETE FROM countries WHERE id=$1
       products:
         connect: postgres://user:pass@host/database

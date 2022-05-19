@@ -136,7 +136,7 @@ editorLoop:
 		// Lines with duplicated primary keys:
 		for i, row := range data {
 			for j, row2 := range data {
-				if i != j && row[0] == row2[0] {
+				if i != j && row[0] != "" && row[0] == row2[0] {
 					fmt.Printf("Error: Duplicate entry %s\n", row[0])
 					if askError() {
 						continue editorLoop

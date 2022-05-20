@@ -67,11 +67,21 @@ func (app *app) readConfig(modeName string) error {
 		log.Printf("Using mode = %q\n", modeName)
 	}
 
-	app.Connect = mode.Connect
-	app.Select = mode.Select
-	app.Insert = mode.Insert
-	app.Update = mode.Update
-	app.Delete = config.Modes[modeName].Delete
+	if app.Connect == "" {
+		app.Connect = mode.Connect
+	}
+	if app.Select == "" {
+		app.Select = mode.Select
+	}
+	if app.Insert == "" {
+		app.Insert = mode.Insert
+	}
+	if app.Update == "" {
+		app.Update = mode.Update
+	}
+	if app.Delete == "" {
+		app.Delete = mode.Delete
+	}
 
 	return nil
 }

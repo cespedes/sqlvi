@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -89,6 +90,9 @@ func run(args []string) error {
 
 editorLoop:
 	for {
+		var tx *sql.Tx
+		var c rune
+
 		err = app.callEditor(f.Name())
 		if err != nil {
 			return err
@@ -100,22 +104,15 @@ editorLoop:
 		cols, data, err := readOrgTable(f)
 		f.Close()
 		if err != nil {
-			fmt.Printf("Error: %s\n", err.Error())
-			if askError() {
-				continue editorLoop
-			}
-			return nil
+			goto errorFound
 		}
 		if app.Debug {
 			log.Printf("cols = %v\n", cols)
 			log.Printf("data = %v\n", data)
 		}
 		if len(orig.Columns) != len(cols) {
-			fmt.Printf("Error: Wrong number of columns in table (%d vs %d)", len(cols), len(orig.Columns))
-			if askError() {
-				continue editorLoop
-			}
-			return nil
+			err = fmt.Errorf("Wrong number of columns in table (%d vs %d)", len(cols), len(orig.Columns))
+			goto errorFound
 		}
 
 		// Wrong lines (primary key different from all the original ones):
@@ -126,22 +123,16 @@ editorLoop:
 					continue findWrongLines
 				}
 			}
-			fmt.Printf("Error: Unexpected row in table: | %s |", strings.Join(row, " | "))
-			if askError() {
-				continue editorLoop
-			}
-			return nil
+			err = fmt.Errorf("Unexpected row in table: | %s |", strings.Join(row, " | "))
+			goto errorFound
 		}
 
 		// Lines with duplicated primary keys:
 		for i, row := range data {
 			for j, row2 := range data {
 				if i != j && row[0] != "" && row[0] == row2[0] {
-					fmt.Printf("Error: Duplicate entry %s\n", row[0])
-					if askError() {
-						continue editorLoop
-					}
-					return nil
+					err = fmt.Errorf("Duplicate entry %s\n", row[0])
+					goto errorFound
 				}
 			}
 		}
@@ -216,7 +207,7 @@ editorLoop:
 			fmt.Printf("\033[31;1mdelete: %d\033[m", len(app.DeleteChanges))
 		}
 		fmt.Println()
-		c := ask("Action?", []askStruct{
+		c = ask("Action?", []askStruct{
 			{'y', "commit changes"},
 			{'e', "open editor again"},
 			{'Q', "discard changes and quit"},
@@ -224,31 +215,44 @@ editorLoop:
 		switch c {
 		case 'e':
 			continue editorLoop
-		case 'y':
-			break editorLoop
 		case 'Q':
 			return nil
 		}
-	}
-	if app.Debug {
-		log.Println("Commiting changes...")
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	for _, c := range append(app.InsertChanges, append(app.UpdateChanges, app.DeleteChanges...)...) {
 		if app.Debug {
-			log.Printf(">> %v\n", c)
+			log.Println("Commiting changes...")
 		}
-		args := make([]interface{}, len(c.args))
-		for i, v := range c.args {
-			args[i] = v
-		}
-		_, err = tx.Exec(c.query, args...)
+		tx, err = db.Begin()
 		if err != nil {
 			return err
 		}
+		for _, c := range append(app.InsertChanges, append(app.UpdateChanges, app.DeleteChanges...)...) {
+			if app.Debug {
+				log.Printf(">> %v\n", c)
+			}
+			args := make([]interface{}, len(c.args))
+			for i, v := range c.args {
+				args[i] = v
+			}
+			_, err = tx.Exec(c.query, args...)
+			if err != nil {
+				goto errorFound
+			}
+		}
+		err = tx.Commit()
+		if err != nil {
+			goto errorFound
+		}
+		return nil
+	errorFound:
+		fmt.Printf("Error: %s\n", err.Error())
+
+		c = ask(`What now?`, []askStruct{
+			{'e', "open editor again"},
+			{'Q', "discard changes and quit"},
+		})
+		if c == 'e' {
+			continue editorLoop
+		}
+		return nil
 	}
-	return tx.Commit()
 }

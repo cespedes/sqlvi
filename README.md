@@ -7,11 +7,6 @@ it updates the database accordingly.
 
 In this state, it only works with PostgreSQL databases.
 
-## Work in progress
-
-This project is a work in progress.  Right now, it cannot do any changes in SQL:
-it is only useful to display SQL results in a text editor.
-
 ## Details
 
 When `sqlvi` executes, it does the following:
@@ -25,12 +20,45 @@ When `sqlvi` executes, it does the following:
 - In a transaction, it inserts, updates, or deletes rows from the database
 
 The SQL queries that `sqlvi` executes must be specified in the configuration file,
-and the first column must be unique and not null (typically the primary key).
+and the first column must be unique and not null within the query
+(it is typically the primary key).
 
-The header (first row) and the primary key (first column) should not be modified.
+The first row (header) and the first column should not be modified.
 When a row is modified, it executes an *update*.
 When a row is deleted, it executes a *delete*.
-When the user inserts a new row, with the primary key empty, it executes an *insert*.
+When the user inserts a new row, with the first column empty, it executes an *insert*.
+
+## Command-line arguments
+
+The general usage of `sqlvi` is:
+
+    sqlvi [options] [ <mode> ]
+
+The `<mode>`, if given, specifies what set of options from the configuration file should
+be applied.
+
+The possible options are:
+
+- `-debug`: enable debugging info.  Not very useful,
+  unless you are debugging errors in the code.
+- `-config <string>`: configuration file to read.
+  If not specified, it reads `.sqlvi.yaml` from the user's
+  home directory.
+- `-connect <string>`: connection string to the database.
+  Right now it can only be user with PostgreSQL databases.
+- `-editor <string>`: editor to use.  If not specified
+  (and not found in the configuration file), it tries `$VISUAL`,
+  `$EDITOR`, `editor`, `vim` and `vi`, in that order.
+- `-select <string>`: Database query to execute on startup and
+  display its result.
+- `-insert <string>`: Database query to add a new row.
+- `-update <string>`: Database query to update a row.
+- `-delete <string>`: Database query to delete a row.
+
+In the `insert`, `update` and `delete` entries there can be arguments
+specified as `$1`, `$2`, `$3`... which will be replaced by those
+columns in the modified row.  It is not needed to specify all the columns, or to
+have them in the same order they appear.  They can also be repeated.
 
 ## Configuration file
 
@@ -51,6 +79,8 @@ When the user inserts a new row, with the primary key empty, it executes an *ins
         insert: INSERT INTO products (name,price) VALUES ($2,$3)
         update: UPDATE products SET name=$2,price=$3 WHERE id=$1
         delete: DELETE FROM product WHERE id=$1
+
+The command-line arguments take precedenve over everything in the configuration file.
 
 ## Text table
 
@@ -73,3 +103,19 @@ It should have these lines, and in this order:
   The first field should be unique and non-empty.
 - A separator line, beginning with `|---`.
 - 0 or more lines after that one (ignored).
+
+## Actions
+
+After the editor finishes, `sqlvi` parses the edited table; if there are any errors,
+it displays them and asks the user what to do (edit the file again, or quit).
+
+If there are no errors, it finds out what lines, if any, have been modified.
+
+If there are no modified lines, it shows `No changes.` and exits.
+
+Otherwise, it displays a summary of changes, with the number of added,
+updated and deleted lines, and asks the user what to do (edit the file again,
+commit changes, or quit).
+
+If the query to the database fails, it shows the error and asks the user again
+what to do: edit the file again, or quit.

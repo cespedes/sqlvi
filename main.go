@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
 func main() {
@@ -245,6 +247,9 @@ editorLoop:
 		return nil
 	errorFound:
 		fmt.Printf("Error: %s\n", err.Error())
+		if err, ok := err.(*pq.Error); ok && err.Detail != "" {
+			fmt.Printf("Details: %s\n", err.Detail)
+		}
 
 		c = ask(`What now?`, []askStruct{
 			{'e', "open editor again"},

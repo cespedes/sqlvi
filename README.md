@@ -19,14 +19,16 @@ When `sqlvi` executes, it does the following:
 - After the editor finishes, it finds the altered rows
 - In a transaction, it inserts, updates, or deletes rows from the database
 
-The SQL queries that `sqlvi` executes must be specified in the configuration file,
-and the first column must be unique and not null within the query
-(it is typically the primary key).
+The SQL queries that `sqlvi` executes can be specified from command line or
+in the configuration file.
 
-The first row (header) and the first column should not be modified.
-When a row is modified, it executes an *update*.
-When a row is deleted, it executes a *delete*.
-When the user inserts a new row, with the first column empty, it executes an *insert*.
+The first column in the results must be unique and not null
+(it is typically a primary key).
+
+The first row (header) and the first column should not be modified from the editor.
+When a row is modified, it executes an **update**.
+When a row is deleted, it executes a **delete**.
+When the user inserts a new row, with the first column empty, it executes an **insert**.
 
 ## Command-line arguments
 

@@ -37,6 +37,8 @@ type configMode struct {
 type config struct {
 	Editor  string
 	Default string
+	Format  string
+	Connect string
 	Modes   map[string]configMode
 }
 
@@ -48,7 +50,10 @@ func (app *app) readConfig(modeName string) error {
 	}
 	data, err := ioutil.ReadFile(app.ConfigFile)
 	if err != nil {
-		return fmt.Errorf("reading %s: %w", app.ConfigFile, err)
+		if app.Debug {
+			log.Printf("Warning: cannot read %s: %s", app.ConfigFile, err.Error())
+		}
+		return nil
 	}
 	if err := yaml.UnmarshalStrict(data, &config); err != nil {
 		return fmt.Errorf("parsing %s: %w", app.ConfigFile, err)
@@ -67,8 +72,17 @@ func (app *app) readConfig(modeName string) error {
 		log.Printf("Using mode = %q\n", modeName)
 	}
 
+	if app.Format == "" {
+		app.Format = config.Format
+		if app.Format == "" {
+			app.Format = "org"
+		}
+	}
 	if app.Connect == "" {
 		app.Connect = mode.Connect
+	}
+	if app.Connect == "" {
+		app.Connect = config.Connect
 	}
 	if app.Select == "" {
 		app.Select = mode.Select

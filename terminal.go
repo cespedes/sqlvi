@@ -43,6 +43,7 @@ func ask(msg string, actions []askStruct) rune {
 			for _, a := range actions {
 				fmt.Printf("  %c -- %s\n", a.char, a.help)
 			}
+			fmt.Printf("  ? -- this help\n")
 			continue
 		}
 		fmt.Printf("Please enter one of [%s?]\n", chars)

@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/lib/pq"
 )
@@ -29,6 +28,7 @@ type app struct {
 	Debug      bool
 	ConfigFile string
 	Editor     string
+	Format     string
 	Connect    string
 	Select     string
 	Insert     string
@@ -45,19 +45,25 @@ func run(args []string) error {
 
 	flags := flag.NewFlagSet(args[0], flag.ExitOnError)
 	flags.BoolVar(&app.Debug, "debug", false, "Debugging")
-	flags.StringVar(&app.ConfigFile, "config", filepath.Join(os.Getenv("HOME"), ".sqlvi.yaml"), "Config file")
+	flags.StringVar(&app.ConfigFile, "config", filepath.Join(os.Getenv("HOME"), ".sqlvirc"), "Config file")
 	flags.StringVar(&app.Connect, "connect", "", "Connect string to database")
+	flags.StringVar(&app.Format, "format", "", "Output format to use (default \"org\")")
 	flags.StringVar(&app.Editor, "editor", "", "Editor to use")
 	flags.StringVar(&app.Select, "select", "", "Database query to display results")
 	flags.StringVar(&app.Insert, "insert", "", "Database query to add a new row")
 	flags.StringVar(&app.Update, "update", "", "Database query to update a row")
 	flags.StringVar(&app.Delete, "delete", "", "Database query to delete a row")
+	flags.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: sqlvi [options] [<mode from config file>]")
+		fmt.Fprintln(os.Stderr, "Options:")
+		flags.PrintDefaults()
+	}
 
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
 	if len(flags.Args()) > 1 {
-		return fmt.Errorf("Too many arguments.")
+		return fmt.Errorf("too many arguments")
 	}
 	modeName := ""
 	if len(flags.Args()) == 1 {
@@ -67,6 +73,12 @@ func run(args []string) error {
 	err := app.readConfig(modeName)
 	if err != nil {
 		return err
+	}
+	if app.Connect == "" {
+		return fmt.Errorf("no connection to database specified")
+	}
+	if app.Select == "" {
+		return fmt.Errorf("no query specified")
 	}
 
 	db, err := sqlConnect(app.Connect)
@@ -85,7 +97,18 @@ func run(args []string) error {
 	tmpName := f.Name()
 	defer os.Remove(tmpName)
 
-	writeOrgTable(f, orig.Columns, orig.Strings)
+	switch app.Format {
+	case "org":
+		writeOrgTable(f, orig.Columns, orig.Strings)
+	case "ini":
+		writeINI(f, orig.Columns, orig.Strings)
+	case "ldap":
+		fallthrough
+	case "yaml":
+		writeYAML(f, orig.Columns, orig.Strings)
+	default:
+		return fmt.Errorf("unknown output format: %q", app.Format)
+	}
 	if err = f.Close(); err != nil {
 		return err
 	}
@@ -103,18 +126,25 @@ editorLoop:
 		if err != nil {
 			return err
 		}
-		cols, data, err := readOrgTable(f)
+		var data [][]string
+		switch app.Format {
+		case "org":
+			data, err = readOrgTable(f, orig.Columns)
+		case "ini":
+			data, err = readINI(f, orig.Columns)
+		case "ldap":
+			fallthrough
+		case "yaml":
+			data, err = readYAML(f, orig.Columns)
+		default:
+			panic("unknown output format")
+		}
 		f.Close()
 		if err != nil {
 			goto errorFound
 		}
 		if app.Debug {
-			log.Printf("cols = %v\n", cols)
 			log.Printf("data = %v\n", data)
-		}
-		if len(orig.Columns) != len(cols) {
-			err = fmt.Errorf("Wrong number of columns in table (%d vs %d)", len(cols), len(orig.Columns))
-			goto errorFound
 		}
 
 		// Wrong lines (primary key different from all the original ones):
@@ -125,7 +155,7 @@ editorLoop:
 					continue findWrongLines
 				}
 			}
-			err = fmt.Errorf("Unexpected row in table: | %s |", strings.Join(row, " | "))
+			err = fmt.Errorf("unexpected entry with id %q in table", row[0])
 			goto errorFound
 		}
 
@@ -133,7 +163,7 @@ editorLoop:
 		for i, row := range data {
 			for j, row2 := range data {
 				if i != j && row[0] != "" && row[0] == row2[0] {
-					err = fmt.Errorf("Duplicate entry %s\n", row[0])
+					err = fmt.Errorf("duplicate entry %s", row[0])
 					goto errorFound
 				}
 			}
